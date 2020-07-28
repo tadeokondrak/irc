@@ -182,47 +182,65 @@ var splitTests = []struct {
 		Prefix{Name: "SomeOp"},
 		"MODE",
 		[]string{"#channel", "+oo", "SomeUser", "AnotherUser"}},
+
+	{"COMMAND with utf-8 param €", "",
+		Tags{},
+		Prefix{},
+		"COMMAND",
+		[]string{"with", "utf-8", "param", "€"}},
+	{"COMMAND with crlf\r\n", "",
+		Tags{},
+		Prefix{},
+		"COMMAND",
+		[]string{"with", "crlf"}},
+	{":prefix-name-with-crlf\r\n", "",
+		Tags{},
+		Prefix{Name: "prefix-name-with-crlf"},
+		"",
+		[]string{}},
+	{":!prefix-user-with-crlf\r\n", "",
+		Tags{},
+		Prefix{User: "prefix-user-with-crlf"},
+		"",
+		[]string{}},
+	{":@prefix-host-with-crlf\r\n", "",
+		Tags{},
+		Prefix{Host: "prefix-host-with-crlf"},
+		"",
+		[]string{}},
 }
 
 func TestSplit(t *testing.T) {
+	t.Parallel()
 	for _, test := range splitTests {
 		test := test
 		t.Run(test.Input, func(t *testing.T) {
 			t.Parallel()
-			tags, rest := parseTags([]byte(test.Input))
-			if !reflect.DeepEqual(tags, test.ExpectedTags) {
+			input := []byte(test.Input)
+			parsed, n := Parse(input)
+			if !reflect.DeepEqual(parsed.Tags, test.ExpectedTags) {
 				t.Logf("tags: expected %#v but got %#v",
-					test.ExpectedTags, tags)
+					test.ExpectedTags, parsed.Tags)
 				t.Fail()
 			}
-			prefix, rest := parsePrefix(rest)
-			if !reflect.DeepEqual(prefix, test.ExpectedPrefix) {
+			if !reflect.DeepEqual(parsed.Prefix, test.ExpectedPrefix) {
 				t.Logf("prefix: expected %#v but got %#v",
-					test.ExpectedPrefix, prefix)
+					test.ExpectedPrefix, parsed.Prefix)
 				t.Fail()
 			}
-			command, rest := parseCommand(rest)
-			if command != test.ExpectedCommand {
+			if parsed.Command != test.ExpectedCommand {
 				t.Logf("command: expected %#v but got %#v",
-					test.ExpectedCommand, command)
+					test.ExpectedCommand, parsed.Command)
 				t.Fail()
 			}
-			params, rest := parseParams(rest)
-			if !reflect.DeepEqual(params, test.ExpectedParams) {
+			if !reflect.DeepEqual(parsed.Params, test.ExpectedParams) {
 				t.Logf("params: expected %#v but got %#v",
-					test.ExpectedParams, params)
+					test.ExpectedParams, parsed.Params)
 				t.Fail()
 			}
-			if !reflect.DeepEqual(rest, []byte(test.ExpectedRest)) {
+			if !reflect.DeepEqual([]byte(test.ExpectedRest), input[n:]) {
 				t.Logf("rest: expected %#v but got %#v",
-					test.ExpectedRest, rest)
-				t.Fail()
-			}
-			manual := Message{tags, prefix, command, params}
-			parsed := Parse([]byte(test.Input))
-			if !reflect.DeepEqual(manual, parsed) {
-				t.Logf("parse was not equal to manual parsing: "+
-					"expected %#v but got %#v", manual, parsed)
+					[]byte(test.ExpectedRest), input[n:])
 				t.Fail()
 			}
 		})
@@ -323,6 +341,7 @@ var joinTests = []struct {
 }
 
 func TestJoin(t *testing.T) {
+	t.Parallel()
 	for _, test := range joinTests {
 		test := test
 		t.Run(test.Allowed[0], func(t *testing.T) {

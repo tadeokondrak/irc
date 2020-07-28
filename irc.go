@@ -84,7 +84,7 @@ func (m Message) String() string {
 	return sb.String()
 }
 
-func parseTags(p []byte) (Tags, []byte) {
+func parseTags(p []byte) (Tags, int) {
 	const (
 		stKey = iota
 		stValue
@@ -92,22 +92,28 @@ func parseTags(p []byte) (Tags, []byte) {
 	)
 
 	tags := Tags{}
+	i := 0
 
-	if p[0] != '@' {
-		return tags, p
+	if p[i] != '@' {
+		return tags, i
 	}
-	p = p[1:]
+	i++
 
 	var key, value strings.Builder
 	st := stKey
-	for _, b := range p {
-		p = p[1:]
+	for _, b := range p[i:] {
+		i++
 		switch b {
-		case ' ', '\r', '\n':
+		case ' ':
 			if key.Len() != 0 {
 				tags[key.String()] = value.String()
 			}
-			return tags, p
+			return tags, i
+		case '\r', '\n':
+			if key.Len() != 0 {
+				tags[key.String()] = value.String()
+			}
+			return tags, i - 1
 		case ';':
 			if key.Len() != 0 {
 				tags[key.String()] = value.String()
@@ -151,72 +157,97 @@ func parseTags(p []byte) (Tags, []byte) {
 		tags[key.String()] = value.String()
 	}
 
-	return tags, p
+	return tags, i
 }
 
-func parsePrefix(p []byte) (Prefix, []byte) {
+func parsePrefix(p []byte) (Prefix, int) {
 	prefix := Prefix{}
+	i := 0
 
-	if p[0] != ':' {
-		return prefix, p
+	if p[i] != ':' {
+		return prefix, i
 	}
-	p = p[1:]
+	i++
 
 	var name strings.Builder
 nameloop:
-	for _, b := range p {
-		p = p[1:]
+	for _, b := range p[i:] {
+		i++
 		switch b {
 		case '!':
 			prefix.Name = name.String()
+			i--
 			break nameloop
-		case ' ', '\r', '\n':
+		case '@':
 			prefix.Name = name.String()
-			return prefix, p
+			i--
+			break nameloop
+		case ' ':
+			prefix.Name = name.String()
+			return prefix, i
+		case '\r', '\n':
+			prefix.Name = name.String()
+			return prefix, i - 1
 		default:
 			name.WriteByte(b)
 		}
 	}
 
-	var user strings.Builder
-userloop:
-	for _, b := range p {
-		p = p[1:]
-		switch b {
-		case '@':
-			prefix.User = user.String()
-			break userloop
-		case ' ', '\r', '\n':
-			prefix.User = user.String()
-			return prefix, p
-		default:
-			user.WriteByte(b)
+	if p[i] == '!' {
+		i++
+		var user strings.Builder
+	userloop:
+		for _, b := range p[i:] {
+			i++
+			switch b {
+			case '@':
+				i--
+				prefix.User = user.String()
+				break userloop
+			case ' ':
+				prefix.User = user.String()
+				return prefix, i
+			case '\r', '\n':
+				prefix.User = user.String()
+				return prefix, i - 1
+			default:
+				user.WriteByte(b)
+			}
 		}
 	}
 
-	var host strings.Builder
-	for _, b := range p {
-		p = p[1:]
-		switch b {
-		case ' ', '\r', '\n':
-			prefix.Host = host.String()
-			return prefix, p
-		default:
-			host.WriteByte(b)
+	if p[i] == '@' {
+		i++
+		var host strings.Builder
+		for _, b := range p[i:] {
+			i++
+			switch b {
+			case ' ':
+				prefix.Host = host.String()
+				return prefix, i
+			case '\r', '\n':
+				prefix.Host = host.String()
+				return prefix, i - 1
+			default:
+				host.WriteByte(b)
+			}
 		}
 	}
 
-	return prefix, p
+	return prefix, i
 }
 
-func parseCommand(p []byte) (string, []byte) {
+func parseCommand(p []byte) (string, int) {
 	var command strings.Builder
+	i := 0
 
-	for _, b := range p {
-		p = p[1:]
+	for _, b := range p[i:] {
+		i++
 		switch b {
-		case ' ', '\r', '\n':
-			return command.String(), p
+		case ' ':
+			return command.String(), i
+		case '\r', '\n':
+			return command.String(), i - 1
 		default:
 			if 'a' <= b && b <= 'z' {
 				b -= 'a' - 'A'
@@ -225,17 +256,18 @@ func parseCommand(p []byte) (string, []byte) {
 		}
 	}
 
-	return command.String(), p
+	return command.String(), i
 }
 
-func parseParams(p []byte) ([]string, []byte) {
+func parseParams(p []byte) ([]string, int) {
 	params := []string{}
+	i := 0
 
 	var param strings.Builder
 	trailing := false
 loop:
-	for _, b := range p {
-		p = p[1:]
+	for _, b := range p[i:] {
+		i++
 		switch b {
 		case ' ':
 			if param.Len() != 0 {
@@ -243,7 +275,11 @@ loop:
 				param.Reset()
 			}
 		case '\r', '\n':
-			return append(params, param.String()), p
+			if param.Len() != 0 {
+				params = append(params, param.String())
+				param.Reset()
+			}
+			return params, i - 1
 		case ':':
 			if param.Len() == 0 {
 				trailing = true
@@ -255,36 +291,45 @@ loop:
 	}
 
 	if trailing {
-		for _, b := range p {
-			p = p[1:]
+		for _, b := range p[i:] {
+			i++
 			switch b {
 			case '\r', '\n':
-				return append(params, param.String()), p
+				return append(params, param.String()), i - 1
 			default:
 				param.WriteByte(b)
 			}
 		}
 
-		return append(params, param.String()), p
+		return append(params, param.String()), i
 	}
 
 	if param.Len() != 0 {
 		params = append(params, param.String())
 	}
 
-	return params, p
+	return params, i
 
 }
 
-func Parse(p []byte) Message {
+func Parse(p []byte) (Message, int) {
 	var message Message
-	message.Tags, p = parseTags(p)
-	message.Prefix, p = parsePrefix(p)
-	message.Command, p = parseCommand(p)
-	message.Params, p = parseParams(p)
-	return message
+	i, j := 0, 0
+	message.Tags, j = parseTags(p[i:])
+	i += j
+	message.Prefix, j = parsePrefix(p[i:])
+	i += j
+	message.Command, j = parseCommand(p[i:])
+	i += j
+	message.Params, j = parseParams(p[i:])
+	i += j
+	if len(p)-i >= 2 && p[i+0] == '\r' && p[i+1] == '\n' {
+		i += 2
+	}
+	return message, i
 }
 
 func ParseString(s string) Message {
-	return Parse([]byte(s))
+	message, _ := Parse([]byte(s))
+	return message
 }
