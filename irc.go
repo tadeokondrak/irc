@@ -312,6 +312,8 @@ loop:
 
 }
 
+// Parse parses an IRC message from p and returns it,
+// along with how much of p it read.
 func Parse(p []byte) (Message, int) {
 	var message Message
 	i, j := 0, 0
@@ -329,6 +331,7 @@ func Parse(p []byte) (Message, int) {
 	return message, i
 }
 
+// ParseString converts s to a byte slice and calls Parse.
 func ParseString(s string) Message {
 	message, _ := Parse([]byte(s))
 	return message
