@@ -208,6 +208,11 @@ var splitTests = []struct {
 		Prefix{Host: "prefix-host-with-crlf"},
 		"",
 		[]string{}},
+	{"", "",
+		Tags{},
+		Prefix{},
+		"",
+		[]string{}},
 }
 
 func TestSplit(t *testing.T) {

@@ -94,7 +94,7 @@ func parseTags(p []byte) (Tags, int) {
 	tags := Tags{}
 	i := 0
 
-	if p[i] != '@' {
+	if len(p) == 0 || p[i] != '@' {
 		return tags, i
 	}
 	i++
@@ -164,7 +164,7 @@ func parsePrefix(p []byte) (Prefix, int) {
 	prefix := Prefix{}
 	i := 0
 
-	if p[i] != ':' {
+	if len(p) == 0 || p[i] != ':' {
 		return prefix, i
 	}
 	i++
