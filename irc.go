@@ -1,6 +1,7 @@
 package irc
 
 import (
+	"bytes"
 	"strings"
 )
 
@@ -12,6 +13,27 @@ type Prefix struct {
 	Host string
 }
 
+func (p Prefix) Bytes() []byte {
+	var buf bytes.Buffer
+	if p.Name != "" || p.User != "" || p.Host != "" {
+		buf.WriteString(p.Name)
+		if p.User != "" {
+			buf.WriteByte('!')
+			buf.WriteString(p.User)
+		}
+		if p.Host != "" {
+			buf.WriteByte('@')
+			buf.WriteString(p.Host)
+		}
+		buf.WriteByte(' ')
+	}
+	return buf.Bytes()
+}
+
+func (p Prefix) String() string {
+	return string(p.Bytes())
+}
+
 type Message struct {
 	Tags
 	Prefix
@@ -19,69 +41,66 @@ type Message struct {
 	Params  []string
 }
 
-func (m Message) String() string {
-	var sb strings.Builder
+func (m Message) Bytes() []byte {
+	var buf bytes.Buffer
 
 	if len(m.Tags) != 0 {
-		sb.WriteByte('@')
+		buf.WriteByte('@')
 		i := 0
 		for tag, value := range m.Tags {
-			sb.WriteString(tag)
+			buf.WriteString(tag)
 			if value != "" {
-				sb.WriteByte('=')
+				buf.WriteByte('=')
 			}
 			for j := 0; j < len(value); j++ {
 				c := value[j]
 				switch c {
 				case ';':
-					sb.WriteString("\\:")
+					buf.WriteString("\\:")
 				case ' ':
-					sb.WriteString("\\s")
+					buf.WriteString("\\s")
 				case '\\':
-					sb.WriteString("\\\\")
+					buf.WriteString("\\\\")
 				case '\r':
-					sb.WriteString("\\r")
+					buf.WriteString("\\r")
 				case '\n':
-					sb.WriteString("\\n")
+					buf.WriteString("\\n")
 				default:
-					sb.WriteByte(c)
+					buf.WriteByte(c)
 				}
 			}
 			if i != len(m.Tags)-1 {
-				sb.WriteByte(';')
+				buf.WriteByte(';')
 			}
 			i++
 		}
-		sb.WriteByte(' ')
+		buf.WriteByte(' ')
 	}
 
-	if m.Name != "" || m.User != "" || m.Host != "" {
-		sb.WriteByte(':')
-		sb.WriteString(m.Name)
-		if m.User != "" {
-			sb.WriteByte('!')
-			sb.WriteString(m.User)
-		}
-		if m.Host != "" {
-			sb.WriteByte('@')
-			sb.WriteString(m.Host)
-		}
-		sb.WriteByte(' ')
+	if p := m.Prefix.Bytes(); len(p) != 0 {
+		buf.WriteByte(':')
+		buf.Write(p)
 	}
 
-	sb.WriteString(m.Command)
+	buf.WriteString(m.Command)
 
 	for i, param := range m.Params {
-		sb.WriteByte(' ')
+		buf.WriteByte(' ')
 		if i == len(m.Params)-1 &&
 			(strings.ContainsAny(param, " :") ||
 				len(param) == 0) {
-			sb.WriteByte(':')
+			buf.WriteByte(':')
 		}
-		sb.WriteString(param)
+		buf.WriteString(param)
 	}
 
-	return sb.String()
+	buf.WriteString("\r\n")
+
+	return buf.Bytes()
+}
+
+func (m Message) String() string {
+	return string(m.Bytes())
 }
 
 func parseTags(p []byte) (Tags, int) {
