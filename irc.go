@@ -7,6 +7,45 @@ import (
 
 type Tags map[string]string
 
+func (t Tags) Bytes() []byte {
+	var buf bytes.Buffer
+
+	i := 0
+	for tag, value := range t {
+		buf.WriteString(tag)
+		if value != "" {
+			buf.WriteByte('=')
+		}
+		for j := 0; j < len(value); j++ {
+			c := value[j]
+			switch c {
+			case ';':
+				buf.WriteString("\\:")
+			case ' ':
+				buf.WriteString("\\s")
+			case '\\':
+				buf.WriteString("\\\\")
+			case '\r':
+				buf.WriteString("\\r")
+			case '\n':
+				buf.WriteString("\\n")
+			default:
+				buf.WriteByte(c)
+			}
+		}
+		if i != len(t)-1 {
+			buf.WriteByte(';')
+		}
+		i++
+	}
+
+	return buf.Bytes()
+}
+
+func (t Tags) String() string {
+	return string(t.Bytes())
+}
+
 type Prefix struct {
 	Name string
 	User string
@@ -15,6 +54,7 @@ type Prefix struct {
 
 func (p Prefix) Bytes() []byte {
 	var buf bytes.Buffer
+
 	if p.Name != "" || p.User != "" || p.Host != "" {
 		buf.WriteString(p.Name)
 		if p.User != "" {
@@ -25,8 +65,8 @@ func (p Prefix) Bytes() []byte {
 			buf.WriteByte('@')
 			buf.WriteString(p.Host)
 		}
-		buf.WriteByte(' ')
 	}
+
 	return buf.Bytes()
 }
 
@@ -44,42 +84,16 @@ type Message struct {
 func (m Message) Bytes() []byte {
 	var buf bytes.Buffer
 
-	if len(m.Tags) != 0 {
+	if p := m.Tags.Bytes(); len(p) != 0 {
 		buf.WriteByte('@')
-		i := 0
-		for tag, value := range m.Tags {
-			buf.WriteString(tag)
-			if value != "" {
-				buf.WriteByte('=')
-			}
-			for j := 0; j < len(value); j++ {
-				c := value[j]
-				switch c {
-				case ';':
-					buf.WriteString("\\:")
-				case ' ':
-					buf.WriteString("\\s")
-				case '\\':
-					buf.WriteString("\\\\")
-				case '\r':
-					buf.WriteString("\\r")
-				case '\n':
-					buf.WriteString("\\n")
-				default:
-					buf.WriteByte(c)
-				}
-			}
-			if i != len(m.Tags)-1 {
-				buf.WriteByte(';')
-			}
-			i++
-		}
+		buf.Write(p)
 		buf.WriteByte(' ')
 	}
 
 	if p := m.Prefix.Bytes(); len(p) != 0 {
 		buf.WriteByte(':')
 		buf.Write(p)
+		buf.WriteByte(' ')
 	}
 
 	buf.WriteString(m.Command)
