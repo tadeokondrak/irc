@@ -225,8 +225,9 @@ nameloop:
 			name.WriteByte(b)
 		}
 	}
+	prefix.Name = name.String()
 
-	if p[i] == '!' {
+	if i < len(p) && p[i] == '!' {
 		i++
 		var user strings.Builder
 	userloop:
@@ -247,9 +248,10 @@ nameloop:
 				user.WriteByte(b)
 			}
 		}
+		prefix.User = user.String()
 	}
 
-	if p[i] == '@' {
+	if i < len(p) && p[i] == '@' {
 		i++
 		var host strings.Builder
 		for _, b := range p[i:] {
@@ -265,6 +267,7 @@ nameloop:
 				host.WriteByte(b)
 			}
 		}
+		prefix.Host = host.String()
 	}
 
 	return prefix, i

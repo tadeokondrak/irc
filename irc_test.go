@@ -213,6 +213,16 @@ var splitTests = []struct {
 		Prefix{},
 		"",
 		[]string{}},
+	{":test", "",
+		Tags{},
+		Prefix{Name: "test"},
+		"",
+		[]string{}},
+	{":!", "",
+		Tags{},
+		Prefix{Name: ""},
+		"",
+		[]string{}},
 }
 
 func TestSplit(t *testing.T) {
