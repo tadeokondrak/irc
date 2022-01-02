@@ -362,7 +362,7 @@ func TestJoin(t *testing.T) {
 		t.Run(test.Allowed[0], func(t *testing.T) {
 			t.Parallel()
 			found := false
-			joined := test.Input.String()
+			joined := strings.TrimSuffix(test.Input.String(), "\r\n")
 			for _, allowed := range test.Allowed {
 				if joined == allowed {
 					found = true
